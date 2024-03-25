@@ -1,8 +1,8 @@
 use crate::{
-	fragmentizer::{DumbFragmentizer, FragmentKind, Fragmentizer},
+	fragmentizer::{DumbFragmentizer, FragmentKind, Fragmentizer, SplitFragmentizer},
 	span::{Source, Span},
 };
-use hunspell_rs::Hunspell;
+use hunspell_rs::{CheckResult, Hunspell};
 
 pub struct WordDiagnostic {
 	pub word: String,
@@ -18,13 +18,23 @@ pub struct Checker<'a> {
 
 impl<'a> Checker<'a> {
 	pub fn new(source: &'a Source) -> Self {
+		let fragmentizer = DumbFragmentizer::new(&source);
 		Self {
 			source,
 			dictionary: Hunspell::new(
 				concat!(env!("HUNSPELL_DICT"), ".aff"),
 				concat!(env!("HUNSPELL_DICT"), ".dic"),
 			),
-			fragmentizer: DumbFragmentizer::new(&source),
+			fragmentizer: SplitFragmentizer::new(&source, fragmentizer).boxed(),
+		}
+	}
+
+	fn diagnostic(&self, word: String, span: Span) -> Option<WordDiagnostic> {
+		match self.dictionary.check(&word) {
+			CheckResult::FoundInDictionary => None,
+			CheckResult::MissingInDictionary => {
+				return Some(WordDiagnostic { word, span });
+			}
 		}
 	}
 }
@@ -34,22 +44,15 @@ impl<'a> Iterator for Checker<'a> {
 
 	fn next(&mut self) -> Option<Self::Item> {
 		loop {
-			let Some(fragment) = self.fragmentizer.next() else {
-				return None;
-			};
+			let fragment = self.fragmentizer.next()?;
 
 			match fragment.kind {
-				FragmentKind::Ident | FragmentKind::Sentence | FragmentKind::Unknown => {
-					let word = self.source.str_from(fragment.span).as_str().unwrap();
-
-					match self.dictionary.check(word) {
-						hunspell_rs::CheckResult::FoundInDictionary => continue,
-						hunspell_rs::CheckResult::MissingInDictionary => {
-							return Some(WordDiagnostic {
-								word: word.to_string(),
-								span: fragment.span,
-							});
-						}
+				FragmentKind::Sentence => todo!(),
+				FragmentKind::Ident | FragmentKind::Unknown => {
+					let source = self.source.str_from(fragment.span).as_str().unwrap();
+					match self.diagnostic(source.to_owned(), fragment.span) {
+						Some(diag) => return Some(diag),
+						None => continue,
 					};
 				}
 			};

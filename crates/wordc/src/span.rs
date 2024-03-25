@@ -23,7 +23,7 @@ impl Source {
 
 	pub fn to_line_col(&self, offset: BytePos) -> Option<Position> {
 		let line = self.0.try_byte_to_line(offset.to_usize()).ok()?;
-		let first_char_of_line = self.0.try_byte_to_char(line).ok()?;
+		let first_char_of_line = self.0.try_line_to_char(line).ok()?;
 		let column = offset.to_usize() - first_char_of_line;
 		Some(Position(line as u32, column as u32))
 	}
@@ -38,8 +38,8 @@ impl Source {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
-	low: BytePos,
-	high: BytePos,
+	pub low: BytePos,
+	pub high: BytePos,
 }
 
 impl Default for Span {
