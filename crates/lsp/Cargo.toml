@@ -1,0 +1,19 @@
+[package]
+name = "lspelling-lsp"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lspelling-wordc = { workspace = true }
+
+hunspell-rs = { workspace = true }
+tracing = { workspace = true }
+
+dashmap = "5.5.3"
+serde_json = "1.0.114"
+tokio = { version = "1.36.0", features = ["full"] }
+tower-lsp = "0.20.0"
+tracing-appender = "0.2.3"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

@@ -1,0 +1,12 @@
+[package]
+name = "lspelling-wordc"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hunspell-rs = { workspace = true }
+tracing = { workspace = true }
+
+ropey = "1.6.1"

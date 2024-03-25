@@ -1,0 +1,9 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.dependencies]
+lspelling-wordc = { path = "crates/wordc" }
+
+hunspell-rs = "0.4.0"
+tracing = "0.1.40"
