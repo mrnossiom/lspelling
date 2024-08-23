@@ -5,5 +5,22 @@ resolver = "2"
 [workspace.dependencies]
 lspelling-wordc = { path = "crates/wordc" }
 
-hunspell-rs = "0.4.0"
-tracing = "0.1.40"
+ruspell = { git = "https://github.com/mrnossiom/ruspell.git" }
+
+tracing = "0.1"
+
+[patch.crates-io]
+tower-lsp = { git = "https://github.com/mrnossiom/tower-lsp", branch = "main" }
+
+[workspace.lints]
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+# cargo = { level = "warn", priority = -1 }
+
+dbg_macro = "warn"
+# missing_docs_in_private_items = "warn"
+# todo = "warn"
+# unwrap_used = "warn"
+[workspace.lints.rustdoc]
+all = "warn"

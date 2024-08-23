@@ -1,15 +1,10 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
-
-    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
 
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
-      };
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     gitignore = {
@@ -18,48 +13,57 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay, gitignore }: flake-utils.lib.eachDefaultSystem (system:
+  outputs = { self, nixpkgs, rust-overlay, gitignore }:
     let
-      overlays = [ (import rust-overlay) ];
-      pkgs = import nixpkgs { inherit system overlays; };
-      rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+      inherit (nixpkgs.lib) genAttrs;
 
-      libraries = with pkgs; [ hunspell.dev libclang.lib stdenv.cc.cc.lib ];
+      forAllSystems = genAttrs [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
+      forAllPkgs = function: forAllSystems (system: function pkgs.${system});
 
-      nativeBuildInputs = with pkgs; [
-        rustToolchain
-        pkg-config
-        act
-        rust-analyzer
+      mkApp = (program: { type = "app"; inherit program; });
 
-        cargo-workspaces
-        cargo-feature
-      ];
-      buildInputs = with pkgs; [ openssl.dev hunspell.dev libclang.lib ];
+      pkgs = forAllSystems (system: (import nixpkgs {
+        inherit system;
+        overlays = [ (import rust-overlay) ];
+      }));
     in
     {
-      formatter = pkgs.nixpkgs-fmt;
+      formatter = forAllPkgs (pkgs: pkgs.nixpkgs-fmt);
 
-      packages = rec {
-        default = git-leave;
-        git-leave = pkgs.callPackage ./package.nix { inherit gitignore; };
-      };
-      apps = rec {
-        default = git-leave;
-        git-leave = flake-utils.lib.mkApp { drv = self.packages.${system}.git-leave; };
-      };
+      packages = forAllPkgs (pkgs: rec {
+        default = lspelling;
+        lspelling = pkgs.callPackage ./package.nix { inherit gitignore; };
+      });
+      apps = forAllSystems (system: rec {
+        default = lspelling;
+        lspelling = mkApp (pkgs.getExe self.packages.${system}.app);
+      });
 
-      devShells.default = pkgs.mkShell {
-        inherit nativeBuildInputs buildInputs;
+      devShells = forAllPkgs (pkgs:
+        with pkgs.lib;
+        let
+          file-rust-toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+          rust-toolchain = file-rust-toolchain.override { extensions = [ "rust-analyzer" ]; };
+        in
+        {
+          default = pkgs.mkShell rec {
+            nativeBuildInputs = with pkgs; [
+              pkg-config
+              rust-toolchain
+              act
 
-        RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
-        LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath libraries;
-        LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
+              cargo-workspaces
+            ];
+            buildInputs = with pkgs; [ hunspell libclang stdenv.cc.cc ];
 
-        RUST_LOG = "lspelling_lsp=debug,lspelling_wordc=debug,info";
+            RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
+            LD_LIBRARY_PATH = makeLibraryPath buildInputs;
 
-        HUNSPELL_DICT = "${pkgs.hunspellDicts.en_US-large}/share/hunspell/en_US";
-      };
-    }
-  );
+            RUST_LOG = "lspelling_lsp=debug,lspelling_wordc=debug,info";
+            LOG_FILE = "/tmp/lspelling.log";
+
+            HUNSPELL_DICT = "${pkgs.hunspellDicts.en_US-large}/share/hunspell/en_US";
+          };
+        });
+    };
 }

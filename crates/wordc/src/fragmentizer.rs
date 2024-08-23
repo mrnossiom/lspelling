@@ -30,6 +30,7 @@ pub(crate) enum FragmentKind {
 #[derive(Debug)]
 pub(crate) struct DumbFragmentizer<'a> {
 	chars: Peekable<Enumerate<Chars<'a>>>,
+	max_chars: usize,
 }
 
 impl<'a> DumbFragmentizer<'a> {
@@ -37,6 +38,7 @@ impl<'a> DumbFragmentizer<'a> {
 		Self {
 			// char_indices is the way
 			chars: source.0.chars().enumerate().peekable(),
+			max_chars: source.0.len_bytes(),
 		}
 	}
 
@@ -66,7 +68,7 @@ impl Iterator for DumbFragmentizer<'_> {
 				// TODO: ugly
 				let span = Span::from_bounds(
 					BytePos(start as u32),
-					BytePos(self.chars.peek().map(|(pos, _)| *pos).unwrap_or(0) as u32),
+					BytePos(self.chars.peek().map_or(self.max_chars, |(pos, _)| *pos) as u32),
 				);
 				break Some(Fragment { kind, span });
 			};
@@ -77,7 +79,7 @@ impl Iterator for DumbFragmentizer<'_> {
 impl DumbFragmentizer<'_> {
 	/// Eats symbols while predicate returns true or until the end of file is reached.
 	pub(super) fn eat_while(&mut self, predicate: impl Fn(char) -> bool) {
-		while let Some(_) = self.chars.next_if(|(_, c)| predicate(*c)) {}
+		while self.chars.next_if(|(_, c)| predicate(*c)).is_some() {}
 	}
 }
 
@@ -108,7 +110,7 @@ impl<'a, F: Fragmentizer> SplitFragmentizer<'a, F> {
 	}
 
 	/// Heck is MIT licenced, let me steal code alone
-	fn split_generic_casing(&self, fragment: Fragment) -> Vec<Fragment> {
+	fn split_generic_casing(&self, fragment: &Fragment) -> Vec<Fragment> {
 		let source = self.source.str_from(fragment.span).as_str().unwrap();
 
 		#[derive(Clone, Copy, PartialEq)]
@@ -211,7 +213,7 @@ impl<F: Fragmentizer> Iterator for SplitFragmentizer<'_, F> {
 					FragmentKind::Sentence => return Some(frag),
 					// Unknown is parsed as indent
 					FragmentKind::Ident | FragmentKind::Unknown => {
-						let mut frags = self.split_generic_casing(frag);
+						let mut frags = self.split_generic_casing(&frag);
 						self.buffer.append(&mut frags);
 					}
 				}

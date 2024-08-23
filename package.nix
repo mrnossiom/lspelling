@@ -13,7 +13,7 @@ rustPlatform.buildRustPackage {
   version = cargoTOML.package.version;
 
   nativeBuildInputs = [ pkg-config ];
-  buildInputs = [ openssl ];
+  buildInputs = [ ];
 
   inherit src;
 

@@ -1,20 +1,27 @@
-use commands::{AddToDict, ADD_TO_DICT};
-use dashmap::DashMap;
-use dictionary::Dictionary;
+//! LSP
+
 use lspelling_wordc::{checker::Checker, span::Source};
+use parking_lot::RwLock;
+use ruspell::Dictionary;
 use serde_json::Value;
-use std::{collections::HashMap, mem};
+use std::{
+	collections::HashMap,
+	mem,
+	panic::{self, PanicInfo},
+	path::Path,
+};
 use tower_lsp::{jsonrpc::Result, lsp_types::*, Client, LanguageServer, LspService, Server};
 use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
 mod commands;
-mod dictionary;
+
+use crate::commands::{AddToDict, ADD_TO_DICT};
 
 #[derive(Debug)]
 struct Backend {
 	client: Client,
 
-	documents: DashMap<Url, TextDocumentItem>,
+	documents: RwLock<HashMap<Uri, TextDocumentItem>>,
 }
 
 trait ToLspType: Sized {
@@ -43,17 +50,20 @@ impl Backend {
 	fn new(client: Client) -> Self {
 		Self {
 			client,
-			documents: Default::default(),
+			documents: RwLock::default(),
 		}
 	}
 
 	#[tracing::instrument(skip_all)]
-	async fn on_change(&self, uri: Url) {
-		let document = self.documents.get(&uri).unwrap();
+	async fn on_change(&self, uri: Uri) {
+		let document = {
+			let map = self.documents.read();
+			// TODO: remove expensive clone
+			map.get(&uri).unwrap().clone()
+		};
 
 		let source = Source::new(&document.text);
 		let diagnostics = Checker::new(&source)
-			.into_iter()
 			.map(|diag| {
 				let range = source.span_to_range(diag.span).unwrap();
 				Diagnostic {
@@ -113,7 +123,10 @@ impl LanguageServer for Backend {
 		DidOpenTextDocumentParams { text_document, .. }: DidOpenTextDocumentParams,
 	) {
 		let uri = text_document.uri.clone();
-		self.documents.insert(uri.clone(), text_document);
+		{
+			let mut map = self.documents.write();
+			map.insert(uri.clone(), text_document);
+		}
 		self.on_change(uri).await;
 	}
 
@@ -126,9 +139,10 @@ impl LanguageServer for Backend {
 		}: DidChangeTextDocumentParams,
 	) {
 		{
-			let Some(mut doc) = self.documents.get_mut(&text_document.uri) else {
-				todo!("couldn't find doc")
-			};
+			let mut doc = self.documents.write();
+			let doc = doc.get_mut(&text_document.uri).unwrap();
+
+			// let Some(mut doc) = self.documents.try_get_mut(&text_document.uri).try_unwrap() else { };
 
 			// TODO: replace with incremental changes
 			doc.text = mem::take(&mut content_changes[0].text);
@@ -140,7 +154,8 @@ impl LanguageServer for Backend {
 
 	#[tracing::instrument(skip_all)]
 	async fn did_close(&self, params: DidCloseTextDocumentParams) {
-		self.documents.remove(&params.text_document.uri);
+		let mut map = self.documents.write();
+		map.remove(&params.text_document.uri);
 	}
 
 	#[tracing::instrument(skip_all)]
@@ -157,16 +172,18 @@ impl LanguageServer for Backend {
 		let data = diagnostic.data.as_ref().unwrap();
 		let tagged_word = data.as_str().unwrap();
 
-		let dict = Dictionary::new();
+		let dict = Dictionary::from_pair(Path::new(env!("HUNSPELL_DICT"))).unwrap();
 
-		let mut actions = dict
-			.suggest(&tagged_word)
+		// let suggest = dict.suggest(tagged_word);
+		let suggest = vec![];
+
+		let mut actions = suggest
 			.into_iter()
 			.map(|replacement_word: String| {
 				let replace_word_edit = TextEdit::new(diagnostic.range, replacement_word.clone());
 
 				CodeActionOrCommand::CodeAction(CodeAction {
-					title: format!("Replace with `{}`", replacement_word),
+					title: format!("Replace with `{replacement_word}`"),
 					kind: Some(CodeActionKind::QUICKFIX),
 					diagnostics: Some(vec![diagnostic.clone()]),
 					edit: Some(WorkspaceEdit::new({
@@ -195,14 +212,14 @@ impl LanguageServer for Backend {
 			ADD_TO_DICT => {
 				// TODO: logic to add custom word to dict
 				let word = params.arguments[0].as_str().unwrap();
-				tracing::info!("Word was added to dict: {}", word);
+				tracing::error!("adding words (`{}`) to dict is not implemented", word);
 
 				self.client
 					.log_message(
 						MessageType::INFO,
-						format!("`{}` was indeed added to dictionary", word),
+						format!("`{word}` was indeed added to dictionary"),
 					)
-					.await
+					.await;
 			}
 			_ => todo!(),
 		};
@@ -211,8 +228,33 @@ impl LanguageServer for Backend {
 	}
 }
 
+fn tracing_panic_hook(panic_info: &PanicInfo) {
+	let payload = panic_info
+		.payload()
+		.downcast_ref::<&'static str>()
+		.map_or_else(
+			|| {
+				panic_info
+					.payload()
+					.downcast_ref::<String>()
+					.map_or("Box<dyn Any>", |s| &s[..])
+			},
+			|s| *s,
+		);
+
+	let location = panic_info.location().map(ToString::to_string);
+
+	tracing::error!(
+		panic.payload = payload,
+		panic.location = location,
+		"A panic occurred",
+	);
+}
+
 #[tokio::main]
 async fn main() {
+	panic::set_hook(Box::new(tracing_panic_hook));
+
 	let file_appender = tracing_appender::rolling::never("/tmp", "lspelling.log");
 	let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 	tracing_subscriber::fmt()

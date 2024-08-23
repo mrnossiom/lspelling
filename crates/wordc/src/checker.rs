@@ -1,8 +1,10 @@
+use std::path::Path;
+
 use crate::{
 	fragmentizer::{DumbFragmentizer, FragmentKind, Fragmentizer, SplitFragmentizer},
 	span::{Source, Span},
 };
-use hunspell_rs::{CheckResult, Hunspell};
+use ruspell::Dictionary;
 
 pub struct WordDiagnostic {
 	pub word: String,
@@ -12,29 +14,26 @@ pub struct WordDiagnostic {
 pub struct Checker<'a> {
 	pub(crate) source: &'a Source,
 	// TODO: dedup with lsp, wa for no send bound
-	dictionary: Hunspell,
+	dictionary: Dictionary,
 	fragmentizer: Box<dyn Fragmentizer + 'a>,
 }
 
 impl<'a> Checker<'a> {
+	#[must_use]
 	pub fn new(source: &'a Source) -> Self {
-		let fragmentizer = DumbFragmentizer::new(&source);
+		let fragmentizer = DumbFragmentizer::new(source);
 		Self {
 			source,
-			dictionary: Hunspell::new(
-				concat!(env!("HUNSPELL_DICT"), ".aff"),
-				concat!(env!("HUNSPELL_DICT"), ".dic"),
-			),
-			fragmentizer: SplitFragmentizer::new(&source, fragmentizer).boxed(),
+			dictionary: Dictionary::from_pair(Path::new(env!("HUNSPELL_DICT"))).unwrap(),
+			fragmentizer: SplitFragmentizer::new(source, fragmentizer).boxed(),
 		}
 	}
 
 	fn diagnostic(&self, word: String, span: Span) -> Option<WordDiagnostic> {
-		match self.dictionary.check(&word) {
-			CheckResult::FoundInDictionary => None,
-			CheckResult::MissingInDictionary => {
-				return Some(WordDiagnostic { word, span });
-			}
+		if self.dictionary.lookup(&word).unwrap() {
+			None
+		} else {
+			Some(WordDiagnostic { word, span })
 		}
 	}
 }

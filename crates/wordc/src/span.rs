@@ -13,14 +13,17 @@ pub struct Range(pub Position, pub Position);
 pub struct Source(pub Rope);
 
 impl Source {
+	#[must_use]
 	pub fn new(source: &str) -> Self {
 		Self(Rope::from_str(source))
 	}
 
+	#[must_use]
 	pub fn str_from(&self, span: Span) -> RopeSlice<'_> {
 		self.0.slice(span.low.to_usize()..span.high.to_usize())
 	}
 
+	#[must_use]
 	pub fn to_line_col(&self, offset: BytePos) -> Option<Position> {
 		let line = self.0.try_byte_to_line(offset.to_usize()).ok()?;
 		let first_char_of_line = self.0.try_line_to_char(line).ok()?;
@@ -28,6 +31,7 @@ impl Source {
 		Some(Position(line as u32, column as u32))
 	}
 
+	#[must_use]
 	pub fn span_to_range(&self, span: Span) -> Option<Range> {
 		let one = self.to_line_col(span.low)?;
 		let two = self.to_line_col(span.high)?;
