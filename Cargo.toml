@@ -1,4 +1,5 @@
 [workspace]
+# TODO: flatten members to root
 members = ["crates/*"]
 resolver = "2"
 
@@ -13,6 +14,8 @@ tracing = "0.1"
 tower-lsp = { git = "https://github.com/mrnossiom/tower-lsp", branch = "main" }
 
 [workspace.lints]
+[workspace.lints.rust]
+unsafe_code = "allow"
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }
@@ -22,5 +25,8 @@ dbg_macro = "warn"
 # missing_docs_in_private_items = "warn"
 # todo = "warn"
 # unwrap_used = "warn"
+
+redundant_pub_crate = "allow"
+cast_possible_truncation = "allow"
 [workspace.lints.rustdoc]
 all = "warn"

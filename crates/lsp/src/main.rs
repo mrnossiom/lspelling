@@ -1,49 +1,28 @@
 //! LSP
 
 use lspelling_wordc::{checker::Checker, span::Source};
-use parking_lot::RwLock;
 use ruspell::Dictionary;
 use serde_json::Value;
 use std::{
 	collections::HashMap,
-	mem,
 	panic::{self, PanicInfo},
 	path::Path,
 };
+use tokio::sync::RwLock;
 use tower_lsp::{jsonrpc::Result, lsp_types::*, Client, LanguageServer, LspService, Server};
 use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
 mod commands;
+mod debounce;
 
 use crate::commands::{AddToDict, ADD_TO_DICT};
+use crate::debounce::{CheckedDocument, ToLspType as _};
 
 #[derive(Debug)]
 struct Backend {
 	client: Client,
 
-	documents: RwLock<HashMap<Uri, TextDocumentItem>>,
-}
-
-trait ToLspType: Sized {
-	type Target;
-
-	fn to_lsp_type(self) -> Self::Target;
-}
-
-impl ToLspType for lspelling_wordc::span::Position {
-	type Target = Position;
-
-	fn to_lsp_type(self) -> Self::Target {
-		Position::new(self.0, self.1)
-	}
-}
-
-impl ToLspType for lspelling_wordc::span::Range {
-	type Target = Range;
-
-	fn to_lsp_type(self) -> Self::Target {
-		Range::new(self.0.to_lsp_type(), self.1.to_lsp_type())
-	}
+	documents: RwLock<HashMap<Uri, CheckedDocument>>,
 }
 
 impl Backend {
@@ -55,30 +34,30 @@ impl Backend {
 	}
 
 	#[tracing::instrument(skip_all)]
-	async fn on_change(&self, uri: Uri) {
-		let document = {
-			let map = self.documents.read();
-			// TODO: remove expensive clone
-			map.get(&uri).unwrap().clone()
-		};
-
-		let source = Source::new(&document.text);
-		let diagnostics = Checker::new(&source)
+	async fn on_change(&self, document: &CheckedDocument) {
+		let diagnostics = document
+			.checker
+			.check()
+			.iter()
 			.map(|diag| {
-				let range = source.span_to_range(diag.span).unwrap();
+				let range = document.source.span_to_range(diag.span).unwrap();
 				Diagnostic {
 					range: range.to_lsp_type(),
 					severity: Some(DiagnosticSeverity::INFORMATION),
 					code: Some(NumberOrString::Number(1)),
 					message: format!("`{}` isn't in a loaded dictionary", diag.word),
-					data: Some(diag.word.into()),
+					data: Some(diag.word.clone().into()),
 					..Default::default()
 				}
 			})
 			.collect();
 
 		self.client
-			.publish_diagnostics(document.uri.clone(), diagnostics, Some(document.version))
+			.publish_diagnostics(
+				document.item.uri.clone(),
+				diagnostics,
+				Some(document.item.version),
+			)
 			.await;
 	}
 
@@ -98,6 +77,7 @@ impl LanguageServer for Backend {
 			capabilities: ServerCapabilities {
 				code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
 				text_document_sync: Some(TextDocumentSyncCapability::Kind(
+					// TextDocumentSyncKind::INCREMENTAL,
 					TextDocumentSyncKind::FULL,
 				)),
 				execute_command_provider: Some(ExecuteCommandOptions {
@@ -123,11 +103,21 @@ impl LanguageServer for Backend {
 		DidOpenTextDocumentParams { text_document, .. }: DidOpenTextDocumentParams,
 	) {
 		let uri = text_document.uri.clone();
-		{
-			let mut map = self.documents.write();
-			map.insert(uri.clone(), text_document);
-		}
-		self.on_change(uri).await;
+
+		let source = Source::new(&text_document.text);
+		let checker = Checker::new(&text_document.language_id, &source);
+		// its late, im tired
+		#[allow(unsafe_code)]
+		let checker = unsafe { std::mem::transmute(checker) };
+		let ck_doc = CheckedDocument {
+			item: text_document,
+			source,
+			checker,
+		};
+
+		self.on_change(&ck_doc).await;
+
+		self.documents.write().await.insert(uri, ck_doc);
 	}
 
 	#[tracing::instrument(skip_all)]
@@ -135,27 +125,24 @@ impl LanguageServer for Backend {
 		&self,
 		DidChangeTextDocumentParams {
 			text_document,
-			mut content_changes,
+			content_changes,
 		}: DidChangeTextDocumentParams,
 	) {
 		{
-			let mut doc = self.documents.write();
-			let doc = doc.get_mut(&text_document.uri).unwrap();
-
-			// let Some(mut doc) = self.documents.try_get_mut(&text_document.uri).try_unwrap() else { };
-
-			// TODO: replace with incremental changes
-			doc.text = mem::take(&mut content_changes[0].text);
-			doc.version = text_document.version;
+			let mut writer = self.documents.write().await;
+			let docu = writer.get_mut(&text_document.uri).unwrap();
+			docu.item.version = text_document.version;
+			docu.update(&content_changes);
+			self.on_change(&docu).await;
 		}
-
-		self.on_change(text_document.uri).await;
 	}
 
 	#[tracing::instrument(skip_all)]
-	async fn did_close(&self, params: DidCloseTextDocumentParams) {
-		let mut map = self.documents.write();
-		map.remove(&params.text_document.uri);
+	async fn did_close(
+		&self,
+		DidCloseTextDocumentParams { text_document }: DidCloseTextDocumentParams,
+	) {
+		self.documents.write().await.remove(&text_document.uri);
 	}
 
 	#[tracing::instrument(skip_all)]

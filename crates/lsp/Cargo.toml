@@ -6,10 +6,10 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
-lspelling-wordc = { workspace = true }
+lspelling-wordc.workspace = true
 
-ruspell = { workspace = true }
-tracing = { workspace = true }
+ruspell.workspace = true
+tracing.workspace = true
 
 parking_lot = "0.12"
 serde_json = "1"
