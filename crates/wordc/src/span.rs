@@ -19,8 +19,11 @@ impl Source {
 	}
 
 	#[must_use]
+	#[track_caller]
 	pub fn str_from(&self, span: Span) -> RopeSlice<'_> {
-		self.0.slice(span.low.to_usize()..span.high.to_usize())
+		self.0
+			.get_slice(span.low.to_usize()..span.high.to_usize())
+			.unwrap()
 	}
 
 	#[must_use]
@@ -59,8 +62,16 @@ impl Span {
 	};
 
 	#[must_use]
-	pub const fn from_bounds(low: BytePos, high: BytePos) -> Self {
+	pub const fn new(low: BytePos, high: BytePos) -> Self {
 		Self { low, high }
+	}
+
+	#[must_use]
+	pub fn relative(self, low: BytePos, high: BytePos) -> Self {
+		Self {
+			low: self.low + low,
+			high: self.low + high,
+		}
 	}
 
 	#[must_use]

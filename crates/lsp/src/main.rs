@@ -22,13 +22,17 @@ use crate::debounce::{CheckedDocument, ToLspType as _};
 struct Backend {
 	client: Client,
 
+	dictionary: Dictionary,
 	documents: RwLock<HashMap<Uri, CheckedDocument>>,
 }
 
 impl Backend {
 	fn new(client: Client) -> Self {
+		let dictionary = Dictionary::from_pair(Path::new(env!("HUNSPELL_DICT"))).unwrap();
+
 		Self {
 			client,
+			dictionary,
 			documents: RwLock::default(),
 		}
 	}
@@ -105,10 +109,17 @@ impl LanguageServer for Backend {
 		let uri = text_document.uri.clone();
 
 		let source = Source::new(&text_document.text);
-		let checker = Checker::new(&text_document.language_id, &source);
+		let checker = Checker::new(self.dictionary.clone(), &text_document.language_id, &source);
+
 		// its late, im tired
 		#[allow(unsafe_code)]
-		let checker = unsafe { std::mem::transmute(checker) };
+		let checker = unsafe {
+			std::mem::transmute::<
+				lspelling_wordc::checker::Checker<'_>,
+				lspelling_wordc::checker::Checker<'_>,
+			>(checker)
+		};
+
 		let ck_doc = CheckedDocument {
 			item: text_document,
 			source,
@@ -158,8 +169,6 @@ impl LanguageServer for Backend {
 
 		let data = diagnostic.data.as_ref().unwrap();
 		let tagged_word = data.as_str().unwrap();
-
-		let dict = Dictionary::from_pair(Path::new(env!("HUNSPELL_DICT"))).unwrap();
 
 		// let suggest = dict.suggest(tagged_word);
 		let suggest = vec![];

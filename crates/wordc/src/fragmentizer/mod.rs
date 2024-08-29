@@ -9,6 +9,8 @@ pub(crate) use self::dumb::DumbFragmentizer;
 pub(crate) use self::rust::RustFragmentizer;
 
 pub(crate) trait Fragmentizer<'a>: Send + Sync + fmt::Debug {
+	fn lang_code(&self) -> &'static str;
+
 	fn fragmentize(&self) -> Vec<Fragment>;
 }
 

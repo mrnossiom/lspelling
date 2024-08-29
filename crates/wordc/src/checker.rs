@@ -1,7 +1,6 @@
-use std::path::Path;
+use std::{collections::HashMap, sync::Mutex};
 
 use crate::{
-	fragmentizer::{DumbFragmentizer, Fragmentizer, RustFragmentizer},
 	processor::{FragmentProcessor, TokenKind},
 	span::{Source, Span},
 };
@@ -18,30 +17,38 @@ pub struct Checker<'a> {
 	pub(crate) source: &'a Source,
 	// TODO: dedup with lsp, wa for no send bound
 	dictionary: Dictionary,
-	fragmentizer: FragmentProcessor<'a>,
+	processor: FragmentProcessor<'a>,
+
+	// TODO: put the mutex higher?
+	cache: Mutex<HashMap<String, bool>>,
 }
 
+/// Initialization
 impl<'a> Checker<'a> {
 	#[must_use]
-	pub fn new(language: &str, source: &'a Source) -> Self {
-		let fragmentizer: Box<dyn Fragmentizer<'a> + 'a> = match language {
-			"rust" |
-			// TODO
-			// "rust" => RustFragmentizer::new(source).boxed(),
-
-			"plaintext" => DumbFragmentizer::new(source).boxed(),
-			_ => todo!(),
-		};
-
+	pub fn new(dictionary: Dictionary, language: &str, source: &'a Source) -> Self {
 		Self {
 			source,
-			dictionary: Dictionary::from_pair(Path::new(env!("HUNSPELL_DICT"))).unwrap(),
-			fragmentizer: FragmentProcessor::new(source, fragmentizer),
+			dictionary,
+			processor: FragmentProcessor::from_lang(language, source),
+
+			cache: Mutex::default(),
 		}
 	}
 
+	// TODO: remove this from api
+	pub fn replace_src(&mut self, source: &'a Source) {
+		self.source = source;
+		self.processor =
+			FragmentProcessor::from_lang(self.processor.fragmentizer.lang_code(), source);
+	}
+}
+
+/// Spellchecking
+impl<'a> Checker<'a> {
+	#[must_use]
 	pub fn check(&self) -> Vec<WordDiagnostic> {
-		let fragments = self.fragmentizer.process();
+		let fragments = self.processor.process();
 		let mut diags = Vec::new();
 
 		for token in fragments {
@@ -60,10 +67,22 @@ impl<'a> Checker<'a> {
 	}
 
 	fn diagnostic(&self, word: String, span: Span) -> Option<WordDiagnostic> {
-		if self.dictionary.lookup(&word).unwrap() {
+		if self.lookup(&word) {
 			None
 		} else {
 			Some(WordDiagnostic { word, span })
+		}
+	}
+
+	fn lookup(&self, word: &str) -> bool {
+		let mut cache = self.cache.lock().unwrap();
+
+		if let Some(lookup) = cache.get(word) {
+			*lookup
+		} else {
+			let lookup = self.dictionary.lookup(word).unwrap();
+			cache.insert(word.to_owned(), lookup);
+			lookup
 		}
 	}
 }

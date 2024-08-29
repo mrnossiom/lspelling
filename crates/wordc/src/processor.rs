@@ -1,5 +1,5 @@
 use crate::{
-	fragmentizer::{Fragment, FragmentKind, Fragmentizer},
+	fragmentizer::{DumbFragmentizer, FragmentKind, Fragmentizer, RustFragmentizer},
 	span::{BytePos, Source, Span},
 };
 
@@ -22,25 +22,42 @@ pub(crate) enum TokenKind {
 
 #[derive(Debug)]
 pub(crate) struct FragmentProcessor<'a> {
-	frag: Box<dyn Fragmentizer<'a> + 'a>,
+	pub(crate) fragmentizer: Box<dyn Fragmentizer<'a> + 'a>,
 	source: &'a Source,
 }
 
 impl<'a> FragmentProcessor<'a> {
-	pub(crate) fn new(source: &'a Source, frag: Box<dyn Fragmentizer<'a> + 'a>) -> Self {
-		Self { frag, source }
+	pub(crate) fn new(fragmentizer: Box<dyn Fragmentizer<'a> + 'a>, source: &'a Source) -> Self {
+		Self {
+			fragmentizer,
+			source,
+		}
+	}
+
+	// TODO: rename
+	pub(crate) fn from_lang(language: &str, source: &'a Source) -> Self {
+		let fragmentizer: Box<dyn Fragmentizer<'a> + 'a> = match language {
+			"rust" => RustFragmentizer::new(source).boxed(),
+			"plaintext" => DumbFragmentizer::new(source).boxed(),
+			_ => todo!(),
+		};
+
+		Self::new(fragmentizer, source)
 	}
 
 	pub(crate) fn process(&self) -> Vec<Token> {
 		let mut tokens = Vec::new();
-		for fragment in self.frag.fragmentize() {
+		for fragment in self.fragmentizer.fragmentize() {
 			match fragment.kind {
 				// TODO: somehow split sentence
-				FragmentKind::Sentence => todo!(),
+				FragmentKind::Sentence => {
+					let mut toks = self.split_sentence(fragment.span);
+					tokens.append(&mut toks);
+				}
 
 				// Unknown is parsed as indent
 				FragmentKind::Ident | FragmentKind::Unknown => {
-					let mut toks = self.split_generic_casing(&fragment);
+					let mut toks = self.split_generic_casing(fragment.span);
 					tokens.append(&mut toks);
 				}
 			}
@@ -49,7 +66,7 @@ impl<'a> FragmentProcessor<'a> {
 	}
 
 	// Heck is MIT licenced, let me steal code alone
-	fn split_generic_casing(&self, fragment: &Fragment) -> Vec<Token> {
+	fn split_generic_casing(&self, span: Span) -> Vec<Token> {
 		#[derive(Clone, Copy, PartialEq)]
 		enum WordMode {
 			/// There have been no lowercase or uppercase characters in the current
@@ -61,7 +78,7 @@ impl<'a> FragmentProcessor<'a> {
 			Uppercase,
 		}
 
-		let source = self.source.str_from(fragment.span).as_str().unwrap();
+		let source = self.source.str_from(span).as_str().unwrap();
 
 		let mut first_word = true;
 		let mut parts_of_fragment = Vec::new();
@@ -89,10 +106,7 @@ impl<'a> FragmentProcessor<'a> {
 						parts_of_fragment.push(Token {
 							// TODO
 							kind: TokenKind::Unknown,
-							span: Span::from_bounds(
-								fragment.span.low + BytePos(init as u32),
-								fragment.span.low + BytePos(next_i as u32),
-							),
+							span: span.relative(BytePos(init as u32), BytePos(next_i as u32)),
 						});
 						first_word = false;
 						init = next_i;
@@ -108,10 +122,7 @@ impl<'a> FragmentProcessor<'a> {
 						parts_of_fragment.push(Token {
 							// TODO
 							kind: TokenKind::Unknown,
-							span: Span::from_bounds(
-								fragment.span.low + BytePos(init as u32),
-								fragment.span.low + BytePos(i as u32),
-							),
+							span: span.relative(BytePos(init as u32), BytePos(i as u32)),
 						});
 						init = i;
 						mode = WordMode::Boundary;
@@ -128,10 +139,7 @@ impl<'a> FragmentProcessor<'a> {
 					parts_of_fragment.push(Token {
 						// TODO
 						kind: TokenKind::Unknown,
-						span: Span::from_bounds(
-							fragment.span.low + BytePos(init as u32),
-							fragment.span.high,
-						),
+						span: Span::new(span.low + BytePos(init as u32), span.high),
 					});
 					break;
 				}
@@ -139,5 +147,31 @@ impl<'a> FragmentProcessor<'a> {
 		}
 
 		parts_of_fragment
+	}
+
+	fn split_sentence(&self, span: Span) -> Vec<Token> {
+		let mut tokens = Vec::new();
+		let source = self.source.str_from(span).as_str().unwrap();
+
+		let mut start_idx = 0;
+		for (i, c) in source.char_indices() {
+			if !c.is_alphabetic() {
+				if start_idx != i {
+					let tk = Token {
+						kind: TokenKind::Ident,
+						span: span.relative(BytePos(start_idx as u32), BytePos(i as u32)),
+					};
+					let ljsf = self.source.str_from(tk.span).as_str().unwrap();
+					tracing::debug!(ljsf);
+					tokens.push(tk);
+				}
+
+				start_idx = i + 1;
+
+				continue;
+			}
+		}
+
+		tokens
 	}
 }

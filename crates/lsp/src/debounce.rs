@@ -14,23 +14,24 @@ pub(crate) struct CheckedDocument {
 
 impl CheckedDocument {
 	pub(crate) fn update(&mut self, changes: &[TextDocumentContentChangeEvent]) {
-		#[allow(unsafe_code)]
 		if let [TextDocumentContentChangeEvent {
 			range: None, text, ..
 		}] = changes
 		{
 			// TODO: change to incremental changes
 			self.source = Source::new(text);
-			self.checker = unsafe {
-				std::mem::transmute::<
-					lspelling_wordc::checker::Checker<'_>,
-					lspelling_wordc::checker::Checker<'_>,
-				>(Checker::new("plaintext", &self.source))
-			};
+
+			#[allow(unsafe_code)]
+			self.checker.replace_src(unsafe {
+				std::mem::transmute::<&lspelling_wordc::span::Source, &lspelling_wordc::span::Source>(
+					&self.source,
+				)
+			});
+
 			return;
 		}
 
-		todo!()
+		todo!("incremental changes")
 
 		// for TextDocumentContentChangeEvent { range, text, .. } in changes {
 		// 	let range = range.unwrap();

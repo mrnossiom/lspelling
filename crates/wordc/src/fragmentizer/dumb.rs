@@ -13,7 +13,7 @@ pub(crate) struct DumbFragmentizer<'a> {
 }
 
 impl<'a> DumbFragmentizer<'a> {
-	pub(crate) fn new(source: &'a Source) -> Self {
+	pub(crate) const fn new(source: &'a Source) -> Self {
 		Self { source }
 	}
 
@@ -23,6 +23,10 @@ impl<'a> DumbFragmentizer<'a> {
 }
 
 impl<'a> Fragmentizer<'a> for DumbFragmentizer<'a> {
+	fn lang_code(&self) -> &'static str {
+		"plaintext"
+	}
+
 	fn fragmentize(&self) -> Vec<Fragment> {
 		let mut chars = self.source.0.chars().enumerate().peekable();
 		let max_chars = self.source.0.len_chars();
@@ -40,7 +44,7 @@ impl<'a> Fragmentizer<'a> for DumbFragmentizer<'a> {
 
 			if let Some(kind) = kind {
 				// TODO: ugly
-				let span = Span::from_bounds(
+				let span = Span::new(
 					BytePos(start as u32),
 					BytePos(chars.peek().map_or(max_chars, |(pos, _)| *pos) as u32),
 				);

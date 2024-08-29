@@ -15,7 +15,7 @@ tower-lsp = { git = "https://github.com/mrnossiom/tower-lsp", branch = "main" }
 
 [workspace.lints]
 [workspace.lints.rust]
-unsafe_code = "allow"
+unsafe_code = "deny"
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }

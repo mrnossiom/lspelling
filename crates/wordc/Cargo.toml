@@ -15,4 +15,3 @@ tree-sitter = "0.23"
 # Tree sitter grammars
 # TODO: don't bundle?
 tree-sitter-rust = "0.21"
-ouroboros = "0.18.4"
