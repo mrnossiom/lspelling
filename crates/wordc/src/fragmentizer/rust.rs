@@ -33,9 +33,7 @@ impl<'a> RustFragmentizer<'a> {
 
 		let query = Query::new(&grammar, SPELLCHECK_QUERY).expect("spellcheck query is correct");
 
-		let tree = parser
-			.parse(source.0.slice(..).as_str().unwrap(), None)
-			.unwrap();
+		let tree = parser.parse(source.0.slice(..).to_string(), None).unwrap();
 
 		Self {
 			source,
@@ -58,11 +56,8 @@ impl<'a> Fragmentizer<'a> for RustFragmentizer<'a> {
 
 	fn fragmentize(&self) -> Vec<Fragment> {
 		let mut cursor = QueryCursor::new();
-		let matches = cursor.matches(
-			&self.query,
-			self.tree.root_node(),
-			self.source.0.slice(..).as_str().unwrap().as_bytes(),
-		);
+		let source = self.source.0.slice(..).to_string();
+		let matches = cursor.matches(&self.query, self.tree.root_node(), source.as_bytes());
 
 		matches
 			.flat_map(|m| {

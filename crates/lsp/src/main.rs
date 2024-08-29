@@ -139,13 +139,11 @@ impl LanguageServer for Backend {
 			content_changes,
 		}: DidChangeTextDocumentParams,
 	) {
-		{
-			let mut writer = self.documents.write().await;
-			let docu = writer.get_mut(&text_document.uri).unwrap();
-			docu.item.version = text_document.version;
-			docu.update(&content_changes);
-			self.on_change(&docu).await;
-		}
+		let mut writer = self.documents.write().await;
+		let docu = writer.get_mut(&text_document.uri).unwrap();
+		docu.item.version = text_document.version;
+		docu.update(&content_changes);
+		self.on_change(docu).await;
 	}
 
 	#[tracing::instrument(skip_all)]
@@ -168,7 +166,7 @@ impl LanguageServer for Backend {
 		};
 
 		let data = diagnostic.data.as_ref().unwrap();
-		let tagged_word = data.as_str().unwrap();
+		let tagged_word = data.to_string();
 
 		// let suggest = dict.suggest(tagged_word);
 		let suggest = vec![];
@@ -196,7 +194,7 @@ impl LanguageServer for Backend {
 			title: "Add this word to the dictionary".into(),
 			kind: Some(CodeActionKind::QUICKFIX),
 			diagnostics: Some(vec![diagnostic.clone()]),
-			command: Some(AddToDict::command(tagged_word.into())),
+			command: Some(AddToDict::command(tagged_word)),
 			..Default::default()
 		}));
 

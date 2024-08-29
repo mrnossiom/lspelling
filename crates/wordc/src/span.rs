@@ -68,6 +68,9 @@ impl Span {
 
 	#[must_use]
 	pub fn relative(self, low: BytePos, high: BytePos) -> Self {
+		debug_assert!(low <= self.high - self.low);
+		debug_assert!(high <= self.high - self.low);
+
 		Self {
 			low: self.low + low,
 			high: self.low + high,

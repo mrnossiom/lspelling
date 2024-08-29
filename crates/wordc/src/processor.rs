@@ -78,7 +78,7 @@ impl<'a> FragmentProcessor<'a> {
 			Uppercase,
 		}
 
-		let source = self.source.str_from(span).as_str().unwrap();
+		let source = self.source.str_from(span).to_string();
 
 		let mut first_word = true;
 		let mut parts_of_fragment = Vec::new();
@@ -151,25 +151,23 @@ impl<'a> FragmentProcessor<'a> {
 
 	fn split_sentence(&self, span: Span) -> Vec<Token> {
 		let mut tokens = Vec::new();
-		let source = self.source.str_from(span).as_str().unwrap();
+		let source = self.source.str_from(span).to_string();
 
 		let mut start_idx = 0;
-		for (i, c) in source.char_indices() {
-			if !c.is_alphabetic() {
-				if start_idx != i {
-					let tk = Token {
-						kind: TokenKind::Ident,
-						span: span.relative(BytePos(start_idx as u32), BytePos(i as u32)),
-					};
-					let ljsf = self.source.str_from(tk.span).as_str().unwrap();
-					tracing::debug!(ljsf);
-					tokens.push(tk);
-				}
-
-				start_idx = i + 1;
-
+		for (index, char_) in source.char_indices() {
+			// TODO: this `matches` is fragile, decide if we keep some chars or ignore other (e.g. `,`)
+			if (char_.is_alphabetic() || matches!(char_, '-' | '\'')) && index != source.len() - 1 {
 				continue;
 			}
+
+			if start_idx != index {
+				tokens.push(Token {
+					kind: TokenKind::Ident,
+					span: span.relative(BytePos(start_idx as u32), BytePos(index as u32)),
+				});
+			}
+
+			start_idx = index + 1;
 		}
 
 		tokens

@@ -54,8 +54,8 @@ impl<'a> Checker<'a> {
 		for token in fragments {
 			match token.kind {
 				TokenKind::Ident | TokenKind::Unknown => {
-					let source = self.source.str_from(token.span).as_str().unwrap();
-					match self.diagnostic(source.to_owned(), token.span) {
+					let source = self.source.str_from(token.span).to_string();
+					match self.diagnostic(source, token.span) {
 						Some(diag) => diags.push(diag),
 						None => continue,
 					};

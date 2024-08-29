@@ -10,4 +10,6 @@ fn function() -> Bye { Bye }
 
 fn foo() -> Bar {
     println!("Hello, World!")
+
+    let bye_jello = "Bye, Jello!";
 }
