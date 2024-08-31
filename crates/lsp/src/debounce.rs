@@ -22,11 +22,8 @@ impl CheckedDocument {
 			self.source = Source::new(text);
 
 			#[allow(unsafe_code)]
-			self.checker.replace_src(unsafe {
-				std::mem::transmute::<&lspelling_wordc::span::Source, &lspelling_wordc::span::Source>(
-					&self.source,
-				)
-			});
+			self.checker
+				.replace_src(unsafe { std::mem::transmute::<&Source, &Source>(&self.source) });
 
 			return;
 		}

@@ -148,26 +148,26 @@ macro_rules! impl_pos {
 				impl $ident {
 					#[must_use]
 					#[inline(always)]
-					pub const fn from_usize(n: usize) -> $ident {
-						$ident(n as $inner_ty)
-					}
-
-					#[must_use]
-					#[inline(always)]
 					pub const fn to_usize(self) -> usize {
 						self.0 as usize
 					}
 
 					#[must_use]
 					#[inline(always)]
-					pub const fn from_u32(n: u32) -> $ident {
-						$ident(n as $inner_ty)
-					}
-
-					#[must_use]
-					#[inline(always)]
 					pub const fn to_u32(self) -> u32 {
 						self.0 as u32
+					}
+				}
+
+				impl From<usize> for $ident {
+					fn from(value: usize) -> Self {
+						$ident(value as $inner_ty)
+					}
+				}
+
+				impl From<u32> for $ident {
+					fn from(value: u32) -> Self {
+						$ident(value as $inner_ty)
 					}
 				}
 

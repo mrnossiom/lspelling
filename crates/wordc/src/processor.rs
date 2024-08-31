@@ -4,17 +4,30 @@ use crate::{
 };
 
 // TODO: rename, make doc, refers to a processed fragment ready to be checked
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Token {
 	pub(crate) kind: TokenKind,
 	pub(crate) span: Span,
 }
 
+impl Token {
+	const fn new(kind: TokenKind, span: Span) -> Self {
+		Self { kind, span }
+	}
+
+	const fn new_word(span: Span) -> Self {
+		Self {
+			kind: TokenKind::Word,
+			span,
+		}
+	}
+}
+
 // TODO: we only support hunspell which is a single word checker
 // we could extend to more complex strategies to lint sentences as a whole
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TokenKind {
-	Ident,
+	Word,
 	Unknown,
 }
 
@@ -39,12 +52,16 @@ impl<'a> FragmentProcessor<'a> {
 		let fragmentizer: Box<dyn Fragmentizer<'a> + 'a> = match language {
 			"rust" => RustFragmentizer::new(source).boxed(),
 			"plaintext" => DumbFragmentizer::new(source).boxed(),
-			_ => todo!(),
+			lang => {
+				tracing::warn!("language `{lang}` is not listed, defaulting to dumb fragmentizer");
+				DumbFragmentizer::new(source).boxed()
+			}
 		};
 
 		Self::new(fragmentizer, source)
 	}
 
+	// TODO: op for keeping sentence as is? useful for other strategies than ruspell
 	pub(crate) fn process(&self) -> Vec<Token> {
 		let mut tokens = Vec::new();
 		for fragment in self.fragmentizer.fragmentize() {
@@ -65,7 +82,8 @@ impl<'a> FragmentProcessor<'a> {
 		tokens
 	}
 
-	// Heck is MIT licenced, let me steal code alone
+	/// Split code idents on casing boundaires to retrieve individual words
+	#[must_use]
 	fn split_generic_casing(&self, span: Span) -> Vec<Token> {
 		#[derive(Clone, Copy, PartialEq)]
 		enum WordMode {
@@ -83,7 +101,9 @@ impl<'a> FragmentProcessor<'a> {
 		let mut first_word = true;
 		let mut parts_of_fragment = Vec::new();
 
-		for word in source.split(|c: char| !c.is_alphanumeric()) {
+		for (index, word) in str_split_indices(&source, |c: char| !c.is_alphanumeric()) {
+			let local_span = span.relative(BytePos::from(index), BytePos::from(index + word.len()));
+
 			let mut char_indices = word.char_indices().peekable();
 			let mut init = 0;
 			let mut mode = WordMode::Boundary;
@@ -104,9 +124,8 @@ impl<'a> FragmentProcessor<'a> {
 					// is uppercase
 					if next_mode == WordMode::Lowercase && next.is_uppercase() {
 						parts_of_fragment.push(Token {
-							// TODO
-							kind: TokenKind::Unknown,
-							span: span.relative(BytePos(init as u32), BytePos(next_i as u32)),
+							kind: TokenKind::Word,
+							span: local_span.relative(BytePos::from(init), BytePos::from(next_i)),
 						});
 						first_word = false;
 						init = next_i;
@@ -120,9 +139,8 @@ impl<'a> FragmentProcessor<'a> {
 							first_word = false;
 						}
 						parts_of_fragment.push(Token {
-							// TODO
-							kind: TokenKind::Unknown,
-							span: span.relative(BytePos(init as u32), BytePos(i as u32)),
+							kind: TokenKind::Word,
+							span: local_span.relative(BytePos::from(init), BytePos::from(i)),
 						});
 						init = i;
 						mode = WordMode::Boundary;
@@ -137,9 +155,8 @@ impl<'a> FragmentProcessor<'a> {
 						first_word = false;
 					}
 					parts_of_fragment.push(Token {
-						// TODO
-						kind: TokenKind::Unknown,
-						span: Span::new(span.low + BytePos(init as u32), span.high),
+						kind: TokenKind::Word,
+						span: Span::new(local_span.low + BytePos::from(init), local_span.high),
 					});
 					break;
 				}
@@ -149,27 +166,64 @@ impl<'a> FragmentProcessor<'a> {
 		parts_of_fragment
 	}
 
+	/// Splits content by whitespace and trim individual words from non-alphabetical characters
+	#[must_use]
 	fn split_sentence(&self, span: Span) -> Vec<Token> {
-		let mut tokens = Vec::new();
 		let source = self.source.str_from(span).to_string();
 
-		let mut start_idx = 0;
-		for (index, char_) in source.char_indices() {
-			// TODO: this `matches` is fragile, decide if we keep some chars or ignore other (e.g. `,`)
-			if (char_.is_alphabetic() || matches!(char_, '-' | '\'')) && index != source.len() - 1 {
-				continue;
-			}
+		str_split_indices(&source, char::is_whitespace)
+			.map(|(index, string)| {
+				let offset_before_trim = addr_of(string);
+				let trimmed = string.trim_matches(|c: char| !c.is_alphabetic());
+				let offset = addr_of(trimmed) - offset_before_trim;
 
-			if start_idx != index {
-				tokens.push(Token {
-					kind: TokenKind::Ident,
-					span: span.relative(BytePos(start_idx as u32), BytePos(index as u32)),
-				});
-			}
+				Token {
+					kind: TokenKind::Word,
+					span: span.relative(
+						BytePos::from(index + offset),
+						BytePos::from(index + trimmed.len()),
+					),
+				}
+			})
+			.collect()
+	}
+}
 
-			start_idx = index + 1;
-		}
+fn addr_of(s: &str) -> usize {
+	s.as_ptr() as usize
+}
 
-		tokens
+fn str_split_indices(
+	slice: &str,
+	pattern: impl FnMut(char) -> bool,
+) -> impl Iterator<Item = (usize, &str)> {
+	slice
+		.split(pattern)
+		.filter(|slice| !slice.is_empty())
+		.map(move |sub| (addr_of(sub) - addr_of(slice), sub))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn split_snake_case_ident() {
+		let source = "
+			let bye_jello = true;
+		";
+		let src = Source::new(source);
+		let proc = FragmentProcessor::from_lang("rust", &src);
+
+		let ident_span = Span::new(BytePos(8), BytePos(8 + 9));
+		assert_eq!(
+			proc.split_generic_casing(ident_span),
+			[
+				// bye
+				Token::new_word(ident_span.relative(BytePos(0), BytePos(3))),
+				// jello
+				Token::new_word(ident_span.relative(BytePos(4), BytePos(9)))
+			]
+		);
 	}
 }

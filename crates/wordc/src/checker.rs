@@ -53,7 +53,7 @@ impl<'a> Checker<'a> {
 
 		for token in fragments {
 			match token.kind {
-				TokenKind::Ident | TokenKind::Unknown => {
+				TokenKind::Word | TokenKind::Unknown => {
 					let source = self.source.str_from(token.span).to_string();
 					match self.diagnostic(source, token.span) {
 						Some(diag) => diags.push(diag),

@@ -1,9 +1,10 @@
 [language-server.lspelling]
 command = "lspelling-lsp"
-# args = ["--stdio"]
-# config = { provideFormatter = true }
-# environment = { "ENV1" = "value1", "ENV2" = "value2" }
 
 [[language]]
 name = "rust"
+language-servers = [ "lspelling" ]
+
+[[language]]
+name = "just"
 language-servers = [ "lspelling" ]

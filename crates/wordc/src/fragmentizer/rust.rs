@@ -1,4 +1,7 @@
-use std::fmt;
+use std::{
+	fmt,
+	ops::{Range, RangeBounds},
+};
 use tree_sitter::{Parser, Query, QueryCapture, QueryCursor, QueryMatch, Tree};
 
 use super::{Fragment, Fragmentizer};
@@ -61,9 +64,8 @@ impl<'a> Fragmentizer<'a> for RustFragmentizer<'a> {
 		let patterns = self.query.capture_names();
 
 		let capture_to_fragment = |match_: &QueryMatch, capture: &QueryCapture| {
-			let start = capture.node.byte_range().start as u32;
-			let end = capture.node.byte_range().end as u32;
-			let span = Span::new(BytePos(start), BytePos(end));
+			let Range { start, end } = capture.node.byte_range();
+			let span = Span::new(BytePos::from(start), BytePos::from(end));
 
 			// TODO: pattern index doesn't match patterns map in any circonstances
 			let kind = match patterns[match_.pattern_index] {

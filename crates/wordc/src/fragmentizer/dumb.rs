@@ -45,8 +45,8 @@ impl<'a> Fragmentizer<'a> for DumbFragmentizer<'a> {
 			if let Some(kind) = kind {
 				// TODO: ugly
 				let span = Span::new(
-					BytePos(start as u32),
-					BytePos(chars.peek().map_or(max_chars, |(pos, _)| *pos) as u32),
+					BytePos::from(start),
+					BytePos::from(chars.peek().map_or(max_chars, |(pos, _)| *pos)),
 				);
 				buffer.push(Fragment { kind, span });
 			};

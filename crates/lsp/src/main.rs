@@ -8,7 +8,7 @@ use std::{
 	panic::{self, PanicInfo},
 	path::Path,
 };
-use tokio::sync::RwLock;
+use tokio::{sync::RwLock, time::Instant};
 use tower_lsp::{jsonrpc::Result, lsp_types::*, Client, LanguageServer, LspService, Server};
 use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
@@ -101,11 +101,12 @@ impl LanguageServer for Backend {
 		Ok(())
 	}
 
-	#[tracing::instrument(skip_all)]
+	#[tracing::instrument(skip_all, fields(document = %__arg1.text_document.uri.path().segments().last().unwrap_or_default()))]
 	async fn did_open(
 		&self,
 		DidOpenTextDocumentParams { text_document, .. }: DidOpenTextDocumentParams,
 	) {
+		let started = Instant::now();
 		let uri = text_document.uri.clone();
 
 		let source = Source::new(&text_document.text);
@@ -113,12 +114,7 @@ impl LanguageServer for Backend {
 
 		// its late, im tired
 		#[allow(unsafe_code)]
-		let checker = unsafe {
-			std::mem::transmute::<
-				lspelling_wordc::checker::Checker<'_>,
-				lspelling_wordc::checker::Checker<'_>,
-			>(checker)
-		};
+		let checker = unsafe { std::mem::transmute::<Checker<'_>, Checker<'_>>(checker) };
 
 		let ck_doc = CheckedDocument {
 			item: text_document,
@@ -129,9 +125,12 @@ impl LanguageServer for Backend {
 		self.on_change(&ck_doc).await;
 
 		self.documents.write().await.insert(uri, ck_doc);
+
+		let elapsed = started.elapsed().as_millis();
+		tracing::debug!("checked new document in {elapsed}ms");
 	}
 
-	#[tracing::instrument(skip_all)]
+	#[tracing::instrument(skip_all, fields(document = %__arg1.text_document.uri.path().segments().last().unwrap_or_default()))]
 	async fn did_change(
 		&self,
 		DidChangeTextDocumentParams {
@@ -139,11 +138,16 @@ impl LanguageServer for Backend {
 			content_changes,
 		}: DidChangeTextDocumentParams,
 	) {
+		let started = Instant::now();
+
 		let mut writer = self.documents.write().await;
 		let docu = writer.get_mut(&text_document.uri).unwrap();
 		docu.item.version = text_document.version;
 		docu.update(&content_changes);
 		self.on_change(docu).await;
+
+		let elapsed = started.elapsed().as_millis();
+		tracing::debug!("checked cached document in {elapsed}ms");
 	}
 
 	#[tracing::instrument(skip_all)]
@@ -206,7 +210,7 @@ impl LanguageServer for Backend {
 			ADD_TO_DICT => {
 				// TODO: logic to add custom word to dict
 				let word = params.arguments[0].as_str().unwrap();
-				tracing::error!("adding words (`{}`) to dict is not implemented", word);
+				tracing::error!("adding word {} to dictionary is not implemented", word);
 
 				self.client
 					.log_message(

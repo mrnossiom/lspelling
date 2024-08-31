@@ -3,7 +3,6 @@
   (identifier)
   (field_identifier)
   (type_identifier)
-  (primitive_type)
 ] @ident
 
 
