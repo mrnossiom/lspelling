@@ -63,27 +63,12 @@ impl<'a> Fragmentizer<'a> for RustFragmentizer<'a> {
 		let capture_to_fragment = |match_: &QueryMatch, capture: &QueryCapture| {
 			let start = capture.node.byte_range().start as u32;
 			let end = capture.node.byte_range().end as u32;
-			let mut span = Span::new(BytePos(start), BytePos(end));
+			let span = Span::new(BytePos(start), BytePos(end));
 
 			// TODO: pattern index doesn't match patterns map in any circonstances
 			let kind = match patterns[match_.pattern_index] {
 				"ident" => FragmentKind::Ident,
 				"sentence.string" | "sentence.comment" => FragmentKind::Sentence,
-				"sentence.comment.raw" => {
-					// Special handling for raw comments content until
-					// we have a way to access comment content
-					match capture.node.grammar_name() {
-						"line_comment" => {
-							span.low = span.low + BytePos(2);
-						}
-						"block_comment" => {
-							span.low = span.low + BytePos(2);
-							span.high = span.high - BytePos(2);
-						}
-						_ => {}
-					};
-					FragmentKind::Sentence
-				}
 				_ => unreachable!("this part is kept in sync with query"),
 			};
 
@@ -113,12 +98,7 @@ mod tests {
 
 		assert_eq!(
 			query.capture_names(),
-			[
-				"ident",
-				"sentence.string",
-				"sentence.comment",
-				"sentence.comment.raw"
-			]
+			["ident", "sentence.string", "sentence.comment"]
 		);
 	}
 }

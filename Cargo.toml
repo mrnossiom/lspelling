@@ -12,6 +12,7 @@ tracing = "0.1"
 
 [patch.crates-io]
 tower-lsp = { git = "https://github.com/mrnossiom/tower-lsp", branch = "main" }
+tree-sitter-rust = { git = "https://github.com/mrnossiom/tree-sitter-rust", branch = "master" }
 
 [workspace.lints]
 [workspace.lints.rust]
