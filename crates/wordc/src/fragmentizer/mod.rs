@@ -26,7 +26,7 @@ pub(crate) enum FragmentKind {
 	// Inner string contains a composed? word with a code case (snake, upper, camel, etc.)
 	Ident,
 
-	// Could be either a string litteral or a comment
+	// Could be either a string literal or a comment
 	// The inner string contains text with spaces
 	Sentence,
 

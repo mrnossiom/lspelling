@@ -1,20 +1,19 @@
-; Process as is
+; Identifiers to "case-split"
 [
+  (identifier)
+  (field_identifier)
   (type_identifier)
   (primitive_type)
-  (field_identifier)
-  (identifier)
 ] @ident
 
 
-; Exclude quotes from the sides
-[
-  (string_literal)
-  (raw_string_literal)
-] @sentence.string
+; String literals' content to process as a sentence
+(string_content) @sentence.string
 
-; Exclude comment pattern
+; Comments' content to process as a sentence
+(doc_comment) @sentence.comment
+; (RAW) Exclude rust-specific comment patterns
 [
-  (line_comment)
-  (block_comment)
-] @sentence.comment
+  (line_comment !doc)
+  (block_comment !doc)
+] @sentence.comment.raw
