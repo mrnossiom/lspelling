@@ -1,10 +1,9 @@
 [workspace]
-# TODO: flatten members to root
-members = ["crates/*"]
+members = ["lspelling-ls", "lspelling-wordc"]
 resolver = "2"
 
 [workspace.dependencies]
-lspelling-wordc = { path = "crates/wordc" }
+lspelling-wordc = { path = "lspelling-wordc" }
 
 ruspell = { git = "https://github.com/mrnossiom/ruspell.git" }
 # ruspell = { path = "../ruspell" }

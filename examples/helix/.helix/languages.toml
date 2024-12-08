@@ -1,5 +1,5 @@
 [language-server.lspelling]
-command = "lspelling-lsp"
+command = "lspelling-ls"
 
 [[language]]
 name = "rust"

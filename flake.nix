@@ -59,7 +59,7 @@
             RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
             LD_LIBRARY_PATH = makeLibraryPath buildInputs;
 
-            RUST_LOG = "lspelling_lsp=debug,lspelling_wordc=debug,info";
+            RUST_LOG = "lspelling_ls=debug,lspelling_wordc=debug,info";
             LOG_FILE = "/tmp/lspelling.log";
 
             HUNSPELL_DICT = "${pkgs.hunspellDicts.en_US-large}/share/hunspell/en_US";

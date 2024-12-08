@@ -15,7 +15,7 @@ pub struct WordDiagnostic {
 #[derive(Debug)]
 pub struct Checker<'a> {
 	pub(crate) source: &'a Source,
-	// TODO: dedup with lsp, wa for no send bound
+	// TODO: dedup with ls, wa for no send bound
 	dictionary: Dictionary,
 	processor: FragmentProcessor<'a>,
 

@@ -462,7 +462,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "lspelling-lsp"
+name = "lspelling-ls"
 version = "0.0.0"
 dependencies = [
  "lspelling-wordc",
