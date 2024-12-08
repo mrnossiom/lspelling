@@ -145,6 +145,7 @@ impl LanguageServer for Backend {
 		docu.item.version = text_document.version;
 		docu.update(&content_changes);
 		self.on_change(docu).await;
+		drop(writer);
 
 		let elapsed = started.elapsed().as_millis();
 		tracing::debug!("checked cached document in {elapsed}ms");
