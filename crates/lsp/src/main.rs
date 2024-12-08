@@ -5,7 +5,7 @@ use ruspell::Dictionary;
 use serde_json::Value;
 use std::{
 	collections::HashMap,
-	panic::{self, PanicInfo},
+	panic::{self, PanicHookInfo},
 	path::Path,
 };
 use tokio::{sync::RwLock, time::Instant};
@@ -226,7 +226,7 @@ impl LanguageServer for Backend {
 	}
 }
 
-fn tracing_panic_hook(panic_info: &PanicInfo) {
+fn tracing_panic_hook(panic_info: &PanicHookInfo) {
 	let payload = panic_info
 		.payload()
 		.downcast_ref::<&'static str>()

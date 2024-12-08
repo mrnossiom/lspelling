@@ -1,7 +1,5 @@
-use std::{
-	fmt,
-	ops::{Range, RangeBounds},
-};
+use std::{fmt, ops::Range};
+use streaming_iterator::StreamingIterator;
 use tree_sitter::{Parser, Query, QueryCapture, QueryCursor, QueryMatch, Tree};
 
 use super::{Fragment, Fragmentizer};
@@ -29,7 +27,7 @@ pub const SPELLCHECK_QUERY: &str = include_str!("../../queries/rust.scm");
 
 impl<'a> RustFragmentizer<'a> {
 	pub(crate) fn new(source: &'a Source) -> Self {
-		let grammar = tree_sitter_rust::language();
+		let grammar = tree_sitter_rust::LANGUAGE.into();
 
 		let mut parser = Parser::new();
 		parser.set_language(&grammar).expect("language is correct");
@@ -60,7 +58,7 @@ impl<'a> Fragmentizer<'a> for RustFragmentizer<'a> {
 	fn fragmentize(&self) -> Vec<Fragment> {
 		let mut cursor = QueryCursor::new();
 		let source = self.source.0.slice(..).to_string();
-		let matches = cursor.matches(&self.query, self.tree.root_node(), source.as_bytes());
+		let mut matches = cursor.matches(&self.query, self.tree.root_node(), source.as_bytes());
 		let patterns = self.query.capture_names();
 
 		let capture_to_fragment = |match_: &QueryMatch, capture: &QueryCapture| {
@@ -77,15 +75,13 @@ impl<'a> Fragmentizer<'a> for RustFragmentizer<'a> {
 			Fragment { kind, span }
 		};
 
-		matches
-			.flat_map(|match_| {
-				match_
-					.captures
-					.iter()
-					.map(|capture| capture_to_fragment(&match_, capture))
-					.collect::<Vec<_>>()
-			})
-			.collect()
+		let mut cap = vec![];
+		while let Some(match_) = matches.next() {
+			for capture in match_.captures {
+				cap.push(capture_to_fragment(match_, capture));
+			}
+		}
+		cap
 	}
 }
 
@@ -95,7 +91,7 @@ mod tests {
 
 	#[test]
 	fn query_expect_patterns() {
-		let grammar = tree_sitter_rust::language();
+		let grammar = tree_sitter_rust::LANGUAGE.into();
 		let query = Query::new(&grammar, SPELLCHECK_QUERY).unwrap();
 
 		assert_eq!(
