@@ -23,3 +23,7 @@ A language server to spellcheck code using different stategies
   - `bash`: `PATH=$PATH:$(realpath target/debug)`
 
 - Change directory to `./examples/helix` and play with the two files in there
+
+---
+
+This work is licensed under [`CeCILL-2.1`](https://choosealicense.com/licenses/cecill-2.1), a strong copyleft French OSS license. This license allows modification and distribution of the software while requiring the same license for derived works.
