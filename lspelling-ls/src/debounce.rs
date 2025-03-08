@@ -1,5 +1,7 @@
 use lspelling_wordc::{checker::Checker, span::Source};
-use tower_lsp::lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextDocumentItem};
+use tower_lsp_server::lsp_types::{
+	Position, Range, TextDocumentContentChangeEvent, TextDocumentItem,
+};
 
 // TODO: wtf is this module
 
@@ -14,9 +16,11 @@ pub(crate) struct CheckedDocument {
 
 impl CheckedDocument {
 	pub(crate) fn update(&mut self, changes: &[TextDocumentContentChangeEvent]) {
-		if let [TextDocumentContentChangeEvent {
-			range: None, text, ..
-		}] = changes
+		if let [
+			TextDocumentContentChangeEvent {
+				range: None, text, ..
+			},
+		] = changes
 		{
 			// TODO: change to incremental changes
 			self.source = Source::new(text);

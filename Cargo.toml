@@ -10,10 +10,6 @@ ruspell = { git = "https://github.com/mrnossiom/ruspell.git" }
 
 tracing = "0.1"
 
-[patch.crates-io]
-# upstream tower-lsp is unmaintained, using ongoing community fork
-tower-lsp = { git = "https://github.com/tower-lsp/tower-lsp", branch = "main" }
-
 [workspace.lints]
 [workspace.lints.rust]
 unsafe_code = "deny"

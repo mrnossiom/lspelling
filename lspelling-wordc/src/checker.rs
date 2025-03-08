@@ -45,7 +45,7 @@ impl<'a> Checker<'a> {
 }
 
 /// Spellchecking
-impl<'a> Checker<'a> {
+impl Checker<'_> {
 	#[must_use]
 	pub fn check(&self) -> Vec<WordDiagnostic> {
 		let fragments = self.processor.process();

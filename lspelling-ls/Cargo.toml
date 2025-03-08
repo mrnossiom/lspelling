@@ -3,7 +3,7 @@ lints.workspace = true
 [package]
 name = "lspelling-ls"
 version = "0.0.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 lspelling-wordc.workspace = true
@@ -11,9 +11,10 @@ lspelling-wordc.workspace = true
 ruspell.workspace = true
 tracing.workspace = true
 
+tower-lsp-server = "0.21"
+
 parking_lot = "0.12"
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
-tower-lsp = "0.20"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

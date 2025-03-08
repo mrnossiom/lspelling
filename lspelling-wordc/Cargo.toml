@@ -3,7 +3,7 @@ lints.workspace = true
 [package]
 name = "lspelling-wordc"
 version = "0.0.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 ruspell.workspace = true
@@ -11,7 +11,7 @@ tracing.workspace = true
 
 ropey = "1"
 streaming-iterator = "0.1"
-tree-sitter = "0.24"
+tree-sitter = "0.25"
 
 # Tree sitter grammars
 # TODO: don't bundle?

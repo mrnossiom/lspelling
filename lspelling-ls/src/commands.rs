@@ -1,4 +1,4 @@
-use tower_lsp::lsp_types::Command;
+use tower_lsp_server::lsp_types::Command;
 
 pub const ADD_TO_DICT: &str = "add-to-dict";
 pub struct AddToDict;

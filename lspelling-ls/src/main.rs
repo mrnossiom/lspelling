@@ -9,13 +9,13 @@ use std::{
 	path::Path,
 };
 use tokio::{sync::RwLock, time::Instant};
-use tower_lsp::{jsonrpc::Result, lsp_types::*, Client, LanguageServer, LspService, Server};
-use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
+use tower_lsp_server::{Client, LanguageServer, LspService, Server, jsonrpc::Result, lsp_types::*};
+use tracing_subscriber::{EnvFilter, fmt::format::FmtSpan};
 
 mod commands;
 mod debounce;
 
-use crate::commands::{AddToDict, ADD_TO_DICT};
+use crate::commands::{ADD_TO_DICT, AddToDict};
 use crate::debounce::{CheckedDocument, ToLspType as _};
 
 #[derive(Debug)]
@@ -69,7 +69,6 @@ impl Backend {
 	async fn word_at(&self, range: Range) {}
 }
 
-#[tower_lsp::async_trait]
 impl LanguageServer for Backend {
 	#[tracing::instrument(skip_all)]
 	async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
@@ -101,7 +100,7 @@ impl LanguageServer for Backend {
 		Ok(())
 	}
 
-	#[tracing::instrument(skip_all, fields(document = %__arg1.text_document.uri.path().segments().last().unwrap_or_default()))]
+	#[tracing::instrument(skip_all, fields(document = %text_document.uri.path().segments().last().unwrap_or_default()))]
 	async fn did_open(
 		&self,
 		DidOpenTextDocumentParams { text_document, .. }: DidOpenTextDocumentParams,
@@ -130,7 +129,7 @@ impl LanguageServer for Backend {
 		tracing::debug!("checked new document in {elapsed}ms");
 	}
 
-	#[tracing::instrument(skip_all, fields(document = %__arg1.text_document.uri.path().segments().last().unwrap_or_default()))]
+	#[tracing::instrument(skip_all, fields(document = %text_document.uri.path().segments().last().unwrap_or_default()))]
 	async fn did_change(
 		&self,
 		DidChangeTextDocumentParams {
