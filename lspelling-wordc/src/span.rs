@@ -20,6 +20,9 @@ impl Source {
 
 	#[must_use]
 	#[track_caller]
+	/// # Panics
+	///
+	/// - If span is out of bounds
 	pub fn str_from(&self, span: Span) -> RopeSlice<'_> {
 		self.0
 			.get_slice(span.low.to_usize()..span.high.to_usize())

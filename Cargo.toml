@@ -13,6 +13,8 @@ tracing = "0.1"
 [workspace.lints]
 [workspace.lints.rust]
 unsafe_code = "deny"
+[workspace.lints.rustdoc]
+all = "warn"
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }
@@ -20,10 +22,8 @@ nursery = { level = "warn", priority = -1 }
 
 dbg_macro = "warn"
 # missing_docs_in_private_items = "warn"
-# todo = "warn"
+todo = "warn"
 # unwrap_used = "warn"
 
 redundant_pub_crate = "allow"
 cast_possible_truncation = "allow"
-[workspace.lints.rustdoc]
-all = "warn"

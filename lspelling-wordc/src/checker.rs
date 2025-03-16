@@ -55,12 +55,11 @@ impl Checker<'_> {
 			match token.kind {
 				TokenKind::Word | TokenKind::Unknown => {
 					let source = self.source.str_from(token.span).to_string();
-					match self.diagnostic(source, token.span) {
-						Some(diag) => diags.push(diag),
-						None => continue,
-					};
+					if let Some(diag) = self.diagnostic(source, token.span) {
+						diags.push(diag);
+					}
 				}
-			};
+			}
 		}
 
 		diags

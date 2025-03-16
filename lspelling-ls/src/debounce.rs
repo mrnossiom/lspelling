@@ -25,9 +25,7 @@ impl CheckedDocument {
 			// TODO: change to incremental changes
 			self.source = Source::new(text);
 
-			#[allow(unsafe_code)]
-			self.checker
-				.replace_src(unsafe { std::mem::transmute::<&Source, &Source>(&self.source) });
+			self.checker.replace_src(&self.source);
 
 			return;
 		}

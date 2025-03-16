@@ -49,7 +49,7 @@ impl<'a> Fragmentizer<'a> for DumbFragmentizer<'a> {
 					BytePos::from(chars.peek().map_or(max_chars, |(pos, _)| *pos)),
 				);
 				buffer.push(Fragment { kind, span });
-			};
+			}
 		}
 		buffer
 	}

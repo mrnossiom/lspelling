@@ -111,7 +111,6 @@ impl LanguageServer for Backend {
 		let source = Source::new(&text_document.text);
 		let checker = Checker::new(self.dictionary.clone(), &text_document.language_id, &source);
 
-		// its late, im tired
 		#[allow(unsafe_code)]
 		let checker = unsafe { std::mem::transmute::<Checker<'_>, Checker<'_>>(checker) };
 
